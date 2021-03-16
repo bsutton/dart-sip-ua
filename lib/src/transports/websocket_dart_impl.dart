@@ -1,47 +1,52 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
-import 'dart:convert';
-import 'dart:async';
+
+import 'package:sip_ua/src/sip_ua_helper.dart';
+
 import '../logger.dart';
 
-typedef void OnMessageCallback(dynamic msg);
-typedef void OnCloseCallback(int code, String reason);
-typedef void OnOpenCallback();
+typedef OnMessageCallback = void Function(dynamic msg);
+typedef OnCloseCallback = void Function(int code, String reason);
+typedef OnOpenCallback = void Function();
 
 class WebSocketImpl {
-  String _url;
+  WebSocketImpl(this._url);
+
+  final String _url;
   WebSocket _socket;
-  final logger = Log();
   OnOpenCallback onOpen;
   OnMessageCallback onMessage;
   OnCloseCallback onClose;
-  WebSocketImpl(this._url);
 
-  void connect({Object protocols, Object headers}) async {
-    logger.info('connect $_url, $headers, $protocols');
+  void connect(
+      {Iterable<String> protocols, WebSocketSettings webSocketSettings}) async {
+    logger.info('connect $_url, ${webSocketSettings.extraHeaders}, $protocols');
     try {
-      _socket =
-          await WebSocket.connect(_url, protocols: protocols, headers: headers);
+      if (webSocketSettings.allowBadCertificate) {
+        /// Allow self-signed certificate, for test only.
+        _socket = await _connectForBadCertificate(_url, webSocketSettings);
+      } else {
+        _socket = await WebSocket.connect(_url,
+            protocols: protocols, headers: webSocketSettings.extraHeaders);
+      }
 
-      /// Allow self-signed certificate, for test only.
-      /// var parsed_url = Grammar.parse(this._url, 'absoluteURI');
-      /// _socket = await _connectForBadCertificate(parsed_url.scheme, parsed_url.host, parsed_url.port);
-
-      this?.onOpen();
-      _socket.listen((data) {
-        this?.onMessage(data);
+      onOpen?.call();
+      _socket.listen((dynamic data) {
+        onMessage?.call(data);
       }, onDone: () {
-        this?.onClose(_socket.closeCode, _socket.closeReason);
+        onClose?.call(_socket.closeCode, _socket.closeReason);
       });
     } catch (e) {
-      this.onClose(500, e.toString());
+      onClose?.call(500, e.toString());
     }
   }
 
-  void send(data) {
+  void send(dynamic data) {
     if (_socket != null) {
       _socket.add(data);
-      logger.debug('send: $data');
+      logger.debug('send: \n\n$data');
     }
   }
 
@@ -55,32 +60,45 @@ class WebSocketImpl {
 
   /// For test only.
   Future<WebSocket> _connectForBadCertificate(
-      String scheme, String host, int port) async {
+      String url, WebSocketSettings webSocketSettings) async {
     try {
-      Random r = new Random();
-      String key = base64.encode(List<int>.generate(8, (_) => r.nextInt(255)));
-      SecurityContext securityContext = new SecurityContext();
+      Random r = Random();
+      String key = base64.encode(List<int>.generate(16, (_) => r.nextInt(255)));
+      SecurityContext securityContext = SecurityContext();
       HttpClient client = HttpClient(context: securityContext);
+
+      if (webSocketSettings.userAgent != null) {
+        client.userAgent = webSocketSettings.userAgent;
+      }
+
       client.badCertificateCallback =
           (X509Certificate cert, String host, int port) {
         logger.warn('Allow self-signed certificate => $host:$port. ');
         return true;
       };
 
-      HttpClientRequest request = await client.getUrl(Uri.parse(
-          (scheme == 'wss' ? 'https' : 'http') +
-              '://$host:$port/ws')); // form the correct url here
+      Uri parsed_uri = Uri.parse(url);
+      Uri uri = parsed_uri.replace(
+          scheme: parsed_uri.scheme == 'wss' ? 'https' : 'http');
 
-      request.headers.add('Connection', 'Upgrade');
-      request.headers.add('Upgrade', 'websocket');
-      request.headers.add('Sec-WebSocket-Protocol', 'sip');
-      request.headers.add(
-          'Sec-WebSocket-Version', '13'); // insert the correct version here
-      request.headers.add('Sec-WebSocket-Key', key.toLowerCase());
+      HttpClientRequest request =
+          await client.getUrl(uri); // form the correct url here
+      request.headers.add('Connection', 'Upgrade', preserveHeaderCase: true);
+      request.headers.add('Upgrade', 'websocket', preserveHeaderCase: true);
+      request.headers.add('Sec-WebSocket-Version', '13',
+          preserveHeaderCase: true); // insert the correct version here
+      request.headers.add('Sec-WebSocket-Key', key.toLowerCase(),
+          preserveHeaderCase: true);
+      request.headers
+          .add('Sec-WebSocket-Protocol', 'sip', preserveHeaderCase: true);
+
+      webSocketSettings.extraHeaders.forEach((String key, dynamic value) {
+        request.headers.add(key, value, preserveHeaderCase: true);
+      });
 
       HttpClientResponse response = await request.close();
-      var socket = await response.detachSocket();
-      var webSocket = WebSocket.fromUpgradedSocket(
+      Socket socket = await response.detachSocket();
+      WebSocket webSocket = WebSocket.fromUpgradedSocket(
         socket,
         protocol: 'sip',
         serverSide: false,

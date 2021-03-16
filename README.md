@@ -6,6 +6,7 @@ A dart-lang version of the SIP UA stack, ported from [JsSIP](https://github.com/
 - SIP over WebSocket (use real SIP in your flutter mobile, [desktop](https://flutter.dev/desktop), [web](https://flutter.dev/web) apps)
 - Audio/video calls ([flutter-webrtc](https://github.com/cloudwebrtc/flutter-webrtc)) and instant messaging
 - Support with standard SIP servers such as OpenSIPS, Kamailio, Asterisk and FreeSWITCH.
+- Support RFC2833 or INFO to send DTMF.
 
 ## Currently supported platforms
 - [X] iOS
@@ -16,36 +17,38 @@ A dart-lang version of the SIP UA stack, ported from [JsSIP](https://github.com/
 - [ ] Windows
 - [ ] Fuchsia
 
-## Quickstart for Web platform
-- [Install Flutter](https://flutter.dev/docs/get-started/install)
-- Verify the install:
+## Install
+
+### Android
+
+- Proguard rules:
+
 ```
-flutter doctor
+-keep class io.flutter.app.** { *; }
+-keep class io.flutter.plugin.**  { *; }
+-keep class io.flutter.util.**  { *; }
+-keep class io.flutter.view.**  { *; }
+-keep class io.flutter.**  { *; }
+-keep class io.flutter.plugins.**  { *; }
+
+-keep class com.cloudwebrtc.webrtc.** {*;}
+-keep class org.webrtc.** {*;}
 ```
-- Run:
-```
-flutter channel beta
-flutter upgrade
-flutter config --enable-web
-git clone https://github.com/cloudwebrtc/dart-sip-ua.git
-cd dart-sip-ua/example
-flutter create .
-flutter pub get
-flutter run -d chrome
-```
-Application should have loaded in Chrome.
+
+## Quickstart
+
+Run example:
+
+- [dart-sip-ua-example](https://github.com/flutter-webrtc/dart-sip-ua/blob/master/example/README.md)
+- or add your example.
 
 Register with SIP server:
 
-In the application, enter connexion settings by clicking the top-right hamburger menu, then click `Accounts`
-- Click `Register`
-  - If registration is ok, it should say `Status: Registered` at the top
-  - If it fails to register, open Chrome Dev tools and looks for errors in the Javascript Console.
-
-Calling:
-- Once registered, click the top-left `Back Arrow` to return to keypad.
-- Enter a phone number
-- Click the green phone icone
+- [Asterisk](https://github.com/flutter-webrtc/dockers/tree/main/asterisk)
+- FreeSWITCH
+- OpenSIPS
+- Kamailio
+- or add your server example.
 
 ## NOTE
 Thanks to the original authors of [JsSIP](https://github.com/versatica/JsSIP) for providing the JS version, which makes it possible to port the [dart-lang](https://dart.dev).
@@ -54,7 +57,7 @@ Thanks to the original authors of [JsSIP](https://github.com/versatica/JsSIP) fo
 - [Saúl Ibarra Corretgé](https://github.com/saghul)
 
 ## Sponsors
-The first version was sponsored by Suretec Systems Ltd. T/A [SureVoIP](http://www.surevoip.co.uk).
+The first version was sponsored by Suretec Systems Ltd. T/A [SureVoIP](https://www.surevoip.co.uk).
 
 ## Contributing
 The project is inseparable from the contributors of the community.
